@@ -14,11 +14,13 @@ SRC = './1.exe'
 # 目标文件名
 DEST = './2.exe'
 # 是否保留首尾空格(True或False,默认不开启,每个文本后自动补00 00)
-SPACE_RESERVE = False
+SPACE_RESERVE = True
 # 是否在只有一个候选时直接确认
 QUICK_COMFIRM = True
 # CSV编码
 CSV_ENCODING = 'gbk'
+# 目标编码编码（ASCII_HEX/Unicode）
+TARGET_ENCODING = 'Unicode'
 
 def swap_endian(bytes, endian = True):
     if endian:
@@ -29,7 +31,13 @@ def swap_endian(bytes, endian = True):
         return bytes
 
 def to_unicode(bytes):
-    return swap_endian(bytearray(binascii.unhexlify("".join([hex(ord(x)).replace('0x', '').zfill(4) for x in bytes]))), ENDIAN_SWAP)
+    if TARGET_ENCODING == 'Unicode':
+        return swap_endian(bytearray(binascii.unhexlify("".join([hex(ord(x)).replace('0x', '').zfill(4) for x in bytes]))), ENDIAN_SWAP)
+    else:
+        return bytearray(binascii.unhexlify("".join([hex(ord(x)).replace('0x', '') for x in bytes])))
+
+def from_hex(bytes):
+    return bytearray(binascii.unhexlify(bytes))
 
 def forcedecode(context,method = 'utf-8'):   
     pos = 0
@@ -139,6 +147,8 @@ def select_context(bytes, positions, baseStr, length, lastSelect = 1):
         try:
             if message == '':
                 return positions[lastSelect - 1], lastSelect
+            if int(message) <= 0:
+                return None, None
             return positions[int(message) - 1], int(message)
         except:
             pass
@@ -166,8 +176,10 @@ for rule in rules:
     if not SPACE_RESERVE:
         rule_dest = to_unicode(rule[1].strip())
     else:
-        rule_dest = to_unicode(rule[1])
-
+        if TARGET_ENCODING == 'Unicode':
+            rule_dest = to_unicode(rule[1])
+        elif TARGET_ENCODING == 'ASCII_HEX':
+            rule_dest = from_hex(rule[1])
     offset = 0
     offsetBegin = 0
     offsetEnd = 0xffffffff
@@ -198,6 +210,8 @@ for rule in rules:
         else:
             locations = kmp(origin, rule_src, offsetBegin, offsetEnd)
         offset, lastSelect = select_context(origin, locations, rule_src, 32, lastSelect)
+        if offset is None:
+            continue
     else:
         print("WRARNING: Dest String is not exist!", rule[0],"->",rule[1])
         os.system('pause')
